@@ -23,7 +23,9 @@ Style:
 __version__ = 2.00
 __author__ = "Wayne Schmidt (wschmidt@sumologic.com)"
 
+import configparser
 import json
+import os
 import sys
 import time
 import argparse
@@ -33,20 +35,23 @@ sys.dont_write_bytecode = True
 
 import sumologicobjects
 
-MY_CFG = 'undefined'
+CFGDICT = {}
+
 PARSER = argparse.ArgumentParser(description="""
 sumocontentmap prints out a map of all content you have in your personal folder
 """)
 
+PARSER.add_argument('-c', metavar='<cfgfile>', dest='CONFIG', \
+                    default='undefined', help='specify a config file')
+PARSER.add_argument("-v", type=int, default=0, metavar='<verbose>', \
+                    dest='verbose', help="specify level of verbose output")
 PARSER.add_argument("-a", metavar='<secret>', dest='MY_SECRET', \
+                    help="set api (format: <key>:<secret>) ")
+PARSER.add_argument("-d", metavar='<cache>', dest='CACHED', \
+                    default='/var/tmp/sumologicobjects', \
                     help="set api (format: <key>:<secret>) ")
 
 ARGS = PARSER.parse_args()
-
-if ARGS.MY_SECRET:
-    (MY_APINAME, MY_APISECRET) = ARGS.MY_SECRET.split(':')
-    SUMO_UID = MY_APINAME
-    SUMO_KEY = MY_APISECRET
 
 DELAY_TIME = 1
 
@@ -54,18 +59,61 @@ OBJECTMAP = {}
 
 ### main driver ###
 
+def initialize_variables():
+    """
+    Define and read configuration file, validating config file entries
+    """
+
+    if ARGS.MY_SECRET:
+        (api_key, api_secret) = ARGS.MY_SECRET.split(':')
+        CFGDICT['SUMOUID'] = api_key
+        CFGDICT['SUMOKEY'] = api_secret
+
+    if ARGS.CACHED:
+        CFGDICT['CACHED'] = ARGS.CACHED
+
+    if ARGS.CONFIG != 'undefined':
+        if os.path.exists(ARGS.CONFIG):
+            config = configparser.RawConfigParser()
+            config.optionxform = str
+            config.read(ARGS.CONFIG)
+        else:
+            print(f'ConfigFile: {ARGS.CONFIG} Missing! Exiting.')
+            sys.exit()
+
+        if ARGS.verbose > 8:
+            print(dict(config.items('Default')))
+
+        if config.has_option("Default", "CACHED"):
+            CFGDICT['CACHED'] = config.get("Default", "CACHED")
+
+        if config.has_option("Default", "SUMOUID"):
+            CFGDICT['SUMOUID'] = config.get("Default", "SUMOUID")
+
+        if config.has_option("Default", "SUMOKEY"):
+            CFGDICT['SUMOKEY'] = config.get("Default", "SUMOKEY")
+
+    return CFGDICT
+
 def main():
     """
     Setup the Sumo API connection, using the required tuple of region, id, and key.
     Once done, then issue the command required
     """
-    source = SumoApiClient(SUMO_UID, SUMO_KEY)
+
+    initialize_variables()
+
+    source = SumoApiClient(CFGDICT['SUMOUID'], CFGDICT['SUMOKEY'])
+
+    os.makedirs(CFGDICT['CACHED'], exist_ok=True)
 
     for myobject, myurl in sumologicobjects.OBJECTMAP.items():
         myoutput = source.show_object(myurl)
-        print(f'### === {myobject} === ###')
-        print(myoutput)
-
+        if ARGS.verbose > 4:
+            print(f'### === {myobject} === ###')
+        outputfile = f'{CFGDICT["CACHED"]}/{myobject}.json'
+        with open (outputfile, 'w', encoding='utf8') as outputobject:
+            outputobject.write(json.dumps(myoutput))
 
 ### class ###
 class SumoApiClient():
