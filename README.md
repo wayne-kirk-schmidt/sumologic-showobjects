@@ -72,7 +72,7 @@ How to Use the Script
 Important Notes
 ===============
 
-NOTE: this script required three items. 
+NOTE: this script requires
 
     1. A Sumo API key name
     2. A Sumo API secret string 
@@ -81,16 +81,6 @@ Reference Notes
 ===============
 
 *   [Manage-API-Keys](https://help.sumologic.com/Manage/Security/Access-Keys)
-
-To Do List:
-===========
-
-* Split out the files into an output directory and tag each object
-
-* Allow for people to specify the objects they want to query via regex
-
-* Provide a means for a config file as well
-
 
 License
 =======
